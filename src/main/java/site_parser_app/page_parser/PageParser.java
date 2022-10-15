@@ -1,6 +1,5 @@
 package site_parser_app.page_parser;
 
-import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -18,46 +17,40 @@ import java.util.regex.Pattern;
 public class PageParser {
 
     public static final String DEFAULT_URL = "https://skillbox.ru/";
-    private static final List<String> STOP_WORDS = Arrays.asList("vkontakte", "pdf", "twitter", "facebook", "instagram", "utm");
-    private static StringBuilder stringBuilder = new StringBuilder();
+    private static final List<String> STOP_WORDS = Arrays.asList("vkontakte", "pdf", "twitter", "facebook", "instagram", "utm", "jpg", "jpeg");
 
-    public static StringBuilder getStringBuilder() {
-        return stringBuilder;
-    }
-
-    // парсим сайт, проходимся по элементам и вызываем метод addDataToDB()
-    public static Set<String> parsing(String linkPage) throws InterruptedException, IOException {
+    //парсим сайт и добавляем энтити в БД
+    public static Set<String> parsing(String currentUrl) throws InterruptedException, IOException {
         Thread.sleep(500);
         Set<String> urlSet = new HashSet<>();
-        Document document = getResponse(linkPage).parse();
+        Document document = getResponse(currentUrl).parse();
+        String content = document.outerHtml(); //получаем контент страницы
+        int statusCode = getResponse(currentUrl).statusCode(); //получаем код ответа страницы
         Elements elements = document.select("a");
         for (Element element : elements) {
             String url = element.attr("href");
-            if (url.startsWith("/")) {
-                url = DEFAULT_URL + url.substring(1);
-                addDataToDB(url, urlSet);
-            } else if (url.startsWith("http") && url.contains(getHostName(DEFAULT_URL))) {
-                addDataToDB(url, urlSet);
+            boolean condition1 = url.startsWith("/");
+            boolean condition2 = (url.startsWith("http") || (url.startsWith("https"))) && url.contains(getHostName(url));
+            boolean condition3 = STOP_WORDS.stream().noneMatch(url::contains); //проверяем нет ли в "недопустимых" ссылок в нашем урле
+            synchronized (ParserAppStart.getResponseEntitySet()) {
+                if (condition1 && condition3) {
+                    urlSet.add(url = DEFAULT_URL + url.substring(1)); // добавляем текущий упл в сет, который мы будем в следующий раз парсить
+                    url = url.substring(1);
+                    ResponseEntity responseEntity = new ResponseEntity(url, statusCode, content);
+                    ParserAppStart.getResponseEntitySet().add(responseEntity); // добавляем энтити в статический сет
+                }
+                if (condition2 && condition3) {
+                    urlSet.add(url); // добавляем текущий упл в сет, который мы будем в следующий раз парсить
+                    url = url.replace("//", "").replace("www.", "");
+                    ResponseEntity responseEntity = new ResponseEntity(url, statusCode, content);
+                    ParserAppStart.getResponseEntitySet().add(responseEntity); // добавляем энтити в статический сет
+                }
             }
         }
         return urlSet;
     }
 
-    //добавляем данные в БД
-    public static void addDataToDB(String url, Set<String> urlSet) {
-        if (STOP_WORDS.stream().noneMatch(url::contains)) {
-            synchronized (ParserAppStart.getSiteTreeSet()) { // TODO: 13.10.2022 позже поменять объект синхронизации
-                if (!ParserAppStart.getSiteTreeSet().contains(url)) {
-                    // TODO: 13.10.2022 реализовать добавление в БД энтити
-                    urlSet.add(url);
-                    ParserAppStart.getSiteTreeSet().add(url);
-                    tabulation(url);
-                }
-            }
-        }
-    }
-
-    //получаем ответ после подключения
+    //получаем ответ
     public static Connection.Response getResponse(String linkPage) throws IOException {
         Connection.Response response = Jsoup.connect(linkPage)
                 .userAgent("Mozilla/5.0 (Windows; U; WindowsNT5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6")
@@ -67,32 +60,14 @@ public class PageParser {
         return response;
     }
 
-    //получаем имя домена из урла
+    //валидируем урл страницы и возвращаем доменное имя
     public static String getHostName(String url) {
         Pattern pattern = Pattern.compile("^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?");
         String domain = null;
         Matcher matcher = pattern.matcher(url);
         if (matcher.find()) {
             domain = matcher.group(3).replace("//", "").replace("www.", "");
-            System.out.println(domain); // TODO: 13.10.2022 позже удалить
         }
         return domain;
-    }
-
-    // TODO: 13.10.2022 позже удалить
-    public static void tabulation(String url) {
-        if (StringUtils.countMatches(url, "/") == 3) {
-            stringBuilder.append(url + "\n");
-        } else if (StringUtils.countMatches(url, "/") == 4) {
-            stringBuilder.append("\t" + url + "\n");
-        } else if (StringUtils.countMatches(url, "/") == 5) {
-            stringBuilder.append("\t" + "\t" + url + "\n");
-        } else if (StringUtils.countMatches(url, "/") == 6) {
-            stringBuilder.append("\t" + "\t" + "\t" + url + "\n");
-        } else if (StringUtils.countMatches(url, "/") == 7) {
-            stringBuilder.append("\t" + "\t" + "\t" + "\t" + url + "\n");
-        } else if (StringUtils.countMatches(url, "/") == 8) {
-            stringBuilder.append("\t" + "\t" + "\t" + "\t" + "\t" + url + "\n");
-        }
     }
 }

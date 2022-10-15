@@ -1,8 +1,8 @@
 package site_parser_app.page_parser;
 
-import java.util.ArrayList;
+import site_parser_app.entity.ResponseEntity;
+
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.RecursiveTask;
 
