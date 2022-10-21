@@ -60,13 +60,4 @@ public class ResponseEntity {
         this.content = content;
     }
 
-    @Override
-    public String toString() {
-        return "ResponseEntity{" +
-                "id=" + id +
-                ", path='" + path + '\'' +
-                ", code=" + code +
-                ", content='" + content + '\'' +
-                '}';
-    }
 }

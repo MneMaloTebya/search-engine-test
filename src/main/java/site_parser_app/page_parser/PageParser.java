@@ -1,51 +1,61 @@
 package site_parser_app.page_parser;
 
 import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import site_parser_app.ParserAppStart;
-import site_parser_app.entity.ResponseEntity;
-
-
+import site_parser_app.DataTransferToDB;
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PageParser {
+    public static final String DEFAULT_URL = "http://www.playback.ru/";
+    private static final List<String> STOP_WORDS = Arrays
+            .asList("vk", "pdf", "twitter", "facebook", "instagram", "utm", "JPG",
+                    "jpg", "jpeg", "JPEG", "png", "hh", "youtube", "apple");
 
-    public static final String DEFAULT_URL = "https://skillbox.ru/";
-    private static final List<String> STOP_WORDS = Arrays.asList("vkontakte", "pdf", "twitter", "facebook", "instagram", "utm", "jpg", "jpeg");
-
-    //парсим сайт и добавляем энтити в БД
-    public static Set<String> parsing(String currentUrl) throws InterruptedException, IOException {
+    //парсим сайт и добавляем урлы в статический сет
+    public static Set<String> parsing(String currentUrl) throws InterruptedException {
         Thread.sleep(500);
         Set<String> urlSet = new HashSet<>();
-        Document document = getResponse(currentUrl).parse();
-        String content = document.outerHtml(); //получаем контент страницы
-        int statusCode = getResponse(currentUrl).statusCode(); //получаем код ответа страницы
-        Elements elements = document.select("a");
-        for (Element element : elements) {
-            String url = element.attr("href");
-            boolean condition1 = url.startsWith("/");
-            boolean condition2 = (url.startsWith("http") || (url.startsWith("https"))) && url.contains(getHostName(url));
-            boolean condition3 = STOP_WORDS.stream().noneMatch(url::contains); //проверяем нет ли в "недопустимых" ссылок в нашем урле
-            synchronized (ParserAppStart.getResponseEntitySet()) {
-                if (condition1 && condition3) {
-                    urlSet.add(url = DEFAULT_URL + url.substring(1)); // добавляем текущий упл в сет, который мы будем в следующий раз парсить
-                    url = url.substring(1);
-                    ResponseEntity responseEntity = new ResponseEntity(url, statusCode, content);
-                    ParserAppStart.getResponseEntitySet().add(responseEntity); // добавляем энтити в статический сет
+        try {
+            try {
+                Document document = getResponse(currentUrl).parse();
+                Elements elements = document.select("a");
+                for (Element element : elements) {
+                    String url = element.attr("href");
+
+                    boolean condition1 = url.startsWith("/");
+                    boolean condition2 = (url.startsWith("http") || (url.startsWith("https"))) && url.contains(getDesiredGroupOfURL(url, 4));
+                    boolean condition3 = STOP_WORDS.stream().noneMatch(url::contains); //проверяем нет ли в "недопустимых" ссылок в нашем урле
+
+                    if (condition1 && condition3) {
+                        url = DEFAULT_URL + url.substring(1);
+                        synchronized (DataTransferToDB.getUrlSet()) { //синхронизируемся
+                            if (!DataTransferToDB.getUrlSet().contains(url)) {
+                                urlSet.add(url);
+                                DataTransferToDB.getUrlSet().add(url);
+                            }
+                        }
+                    }
+                    if (condition2 && condition3) {
+                        synchronized (DataTransferToDB.getUrlSet()) { //синхронизируемся
+                            if (!DataTransferToDB.getUrlSet().contains(url)) {
+                                urlSet.add(url);
+                                DataTransferToDB.getUrlSet().add(url);
+                            }
+                        }
+                    }
                 }
-                if (condition2 && condition3) {
-                    urlSet.add(url); // добавляем текущий упл в сет, который мы будем в следующий раз парсить
-                    url = url.replace("//", "").replace("www.", "");
-                    ResponseEntity responseEntity = new ResponseEntity(url, statusCode, content);
-                    ParserAppStart.getResponseEntitySet().add(responseEntity); // добавляем энтити в статический сет
-                }
+            } catch (HttpStatusException e) {
+                return Collections.EMPTY_SET;
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
         return urlSet;
     }
@@ -60,14 +70,25 @@ public class PageParser {
         return response;
     }
 
-    //валидируем урл страницы и возвращаем доменное имя
-    public static String getHostName(String url) {
+    //проверяем урл страницы и возвращаем доменное имя
+    public static String getDesiredGroupOfURL(String url, int group) {
         Pattern pattern = Pattern.compile("^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?");
-        String domain = null;
+        String desiredGroup = null;
         Matcher matcher = pattern.matcher(url);
         if (matcher.find()) {
-            domain = matcher.group(3).replace("//", "").replace("www.", "");
+            switch (group) {
+                case 1: desiredGroup = matcher.group(1);
+                    break;
+                case 2 : desiredGroup = matcher.group(2);
+                    break;
+                case 3 : desiredGroup = matcher.group(3);
+                    break;
+                case 4 : desiredGroup = matcher.group(4);
+                    break;
+                case 5 : desiredGroup = matcher.group(5);
+                    break;
+            }
         }
-        return domain;
+        return desiredGroup;
     }
 }
