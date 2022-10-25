@@ -1,10 +1,12 @@
 package site_parser_app.entity;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "responses")
-public class ResponseEntity {
+@Table(name = "pages")
+public class PageEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,13 +21,28 @@ public class ResponseEntity {
     @Column(name = "content")
     private String content;
 
-    public ResponseEntity(String path, int code, String content) {
+    @ManyToMany(cascade = CascadeType.ALL)
+    @JoinTable(
+            name = "indexes",
+            joinColumns = @JoinColumn(name = "lemma_id"),
+            inverseJoinColumns = @JoinColumn(name = "page_id")
+    )
+    private List<LemmaEntity> lemmas;
+
+    public PageEntity(String path, int code, String content) {
         this.path = path;
         this.code = code;
         this.content = content;
     }
 
-    public ResponseEntity() {
+    public void addLemmas(LemmaEntity lemmaEntity) {
+        if (lemmas == null) {
+            lemmas = new ArrayList<>();
+        }
+        lemmas.add(lemmaEntity);
+    }
+
+    public PageEntity() {
     }
 
     public int getId() {

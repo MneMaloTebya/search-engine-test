@@ -13,6 +13,9 @@
         <property name="dialect">org.hibernate.dialect.MySQLDialect</property>
         <property name="show_sql">true</property>
 
-        <mapping class="site_parser_app.entity.ResponseEntity"></mapping>
+        <mapping class="site_parser_app.entity.PageEntity"></mapping>
+        <mapping class="site_parser_app.entity.FieldEntity"></mapping>
+        <mapping class="site_parser_app.entity.LemmaEntity"></mapping>
+        <mapping class="site_parser_app.entity.IndexEntity"></mapping>
     </session-factory>
 </hibernate-configuration>

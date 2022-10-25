@@ -16,12 +16,12 @@ public class PageParser {
     public static final String DEFAULT_URL = "http://www.playback.ru/";
     private static final List<String> STOP_WORDS = Arrays
             .asList("vk", "pdf", "twitter", "facebook", "instagram", "utm", "JPG",
-                    "jpg", "jpeg", "JPEG", "png", "hh", "youtube", "apple");
+                    "jpg", "jpeg", "JPEG", "png", "hh", "youtube", "apple", "yandex", "google");
 
     //парсим сайт и добавляем урлы в статический сет
     public static Set<String> parsing(String currentUrl) throws InterruptedException {
         Thread.sleep(500);
-        Set<String> urlSet = new HashSet<>();
+        Set<String> urlSet = new LinkedHashSet<>();
         try {
             try {
                 Document document = getResponse(currentUrl).parse();
@@ -30,7 +30,9 @@ public class PageParser {
                     String url = element.attr("href");
 
                     boolean condition1 = url.startsWith("/");
-                    boolean condition2 = (url.startsWith("http") || (url.startsWith("https"))) && url.contains(getDesiredGroupOfURL(url, 4));
+                    boolean condition2 =
+                            (url.startsWith("http") || (url.startsWith("https")))
+                            && url.contains(getDesiredGroupOfURL(url, 4));
                     boolean condition3 = STOP_WORDS.stream().noneMatch(url::contains); //проверяем нет ли в "недопустимых" ссылок в нашем урле
 
                     if (condition1 && condition3) {
